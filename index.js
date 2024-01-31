@@ -62,52 +62,64 @@ async function main() {
     const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
     const imageBuffer = Buffer.from(response.data);
 
+    // Insertion de name dans Seller
+    const SellerName = 'INSERT INTO seller (name) VALUES ($1) RETURNING pk';
+    const SellerValue = ['Le new test'];
 
-    // Insertion de name, brand, color, size, weight, description, date, category, subcategory, subsubcategory type, passion et photo du produit dans la base de données PostgreSQL
-    const productInsertQuery = 'INSERT INTO products (name, description, photo) VALUES ($1, $2, $3) RETURNING pk';
-    const productValues = [productNameText, descriptionText, imageBuffer];
+    // Utilisez SellerId comme clé étrangère de SellerValue
+    const sellerResult = await client.query(SellerName, SellerValue);
 
-    // Utilisez productId comme clé étrangère de product
-    const productResult = await client.query(productInsertQuery, productValues);
+    // Verification et de la creation du sellerID pour l'inserer dans products comme FK
+   
+      const sellerId = sellerResult.rows[0].pk;
+      console.log('sellerId récupéré:', sellerId); // Ceci devrait afficher le sellerId récupéré
+    
+      // Utilisez sellerId pour l'insertion dans products
+      const productInsertQuery = 'INSERT INTO products (name, description, seller_id, photo) VALUES ($1, $2, $3, $4) RETURNING pk;'
+      const productValues = [productNameText, descriptionText, sellerId, imageBuffer];
+      const productResult = await client.query(productInsertQuery, productValues);
+      const productId = productResult.rows[0].pk;
+    
+      // Autres opérations...
+   
 
+    try {
+      if (sellerResult.rows.length >= 0 )  {
+        // Assurez-vous que l'indice [2] est correct en fonction de la structure des résultats
+        const sellerId = sellerResult.rows[0].pk;
+        const productId = productResult.rows[0].pk;
+
+        console.log('Voici selledID:', sellerId);
+
+
+        // Insertion de price dans Price
+        const priceInsertQuery = 'INSERT INTO price (seller, price, link, product) VALUES ($1, $2, $3, $4)';
+        const priceValues = [sellerId, priceText, imageURL, productId];
+
+        await client.query(priceInsertQuery, priceValues);
+
+        console.log('Image ajoutée à la base de données avec succès');
+
+      
+      } else {
+        console.error('La requête pour Seller n\'a renvoyé aucune ligne');
+        // Gérez le cas où la requête pour Seller ne renvoie aucune ligne
+      }
+    } catch (sellerError) {
+      console.error('Une erreur s\'est produite lors de l\'insertion des données Seller:', sellerError);
+    }
+    
     try {
       if (productResult.rows.length > 0) {
   
         const productId = productResult.rows[0].pk;
 
-        // Insertion de name dans Seller
-        const SellerName = 'INSERT INTO seller (name) VALUES ($1) RETURNING pk';
-        const SellerValue = ['Le nouveau test'];
-
         // Insertion dans Occasion de la FK
         const OccasionInsert = 'INSERT INTO occasion (product) VALUES ($1)';
         const Occasion = [productId];
 
-        // Utilisez SellerId comme clé étrangère de SellerValue
-        const sellerResult = await client.query(SellerName, SellerValue);
-         await client.query(OccasionInsert, Occasion);
+        await client.query(OccasionInsert, Occasion);
 
-        try {
-          if (sellerResult.rows.length >= 0) {
-            // Assurez-vous que l'indice [2] est correct en fonction de la structure des résultats
-            const sellerId = sellerResult.rows[0].pk;
-
-            // Insertion de price dans Price
-            const priceInsertQuery = 'INSERT INTO price (seller, price, link, product) VALUES ($1, $2, $3, $4)';
-            const priceValues = [sellerId, priceText, imageURL, productId];
-
-            await client.query(priceInsertQuery, priceValues);
-
-            console.log('Image ajoutée à la base de données avec succès');
-
-          
-          } else {
-            console.error('La requête pour Seller n\'a renvoyé aucune ligne');
-            // Gérez le cas où la requête pour Seller ne renvoie aucune ligne
-          }
-        } catch (sellerError) {
-          console.error('Une erreur s\'est produite lors de l\'insertion des données Seller:', sellerError);
-        }
       } else {
         console.error('La requête pour Product n\'a renvoyé aucune ligne');
         // Gérez le cas où la requête pour Product ne renvoie aucune ligne
